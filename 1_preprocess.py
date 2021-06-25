@@ -7,7 +7,7 @@ import pdb
 import community
 from collections import defaultdict
 
-def partition(graph, resolution=100000):
+def partition(graph, resolution=1):
     part = community.best_partition(graph, resolution=resolution)
     community_number = max(part.values()) + 1
     print("community number: ", community_number)
@@ -17,14 +17,14 @@ def partition(graph, resolution=100000):
         com2nodes[com].append(node)
 
     for com, node_list in com2nodes.items():
-        if len(node_list) < 1000:  # 500
+        if len(node_list) < 500:  # 500
             # print('community {} size {} and we ignore it'.format(com, len(node_list)))
             continue
         else:
             print('community {} size {}'.format(com, len(node_list)))
             nodes_part_list.append(node_list)
 
-    print('we have {} communities and each of them is larger than 1000'.format(len(nodes_part_list)))
+    print('we have {} communities and each of them is larger than 500'.format(len(nodes_part_list)))
     return nodes_part_list
 
 target_network = ["flickr", "myspace"]
@@ -32,7 +32,7 @@ target_network = ["flickr", "myspace"]
 # for network_name in target_network:
 #     graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
 #     nodes_part_list = partition(graph)
-#     pickle.dump(nodes_part_list, open('./dataset/{}.nodes_part_list'.format(network_name), 'wb'))
+#     pickle.dump(nodes_part_list, open('./dataset/{name}/{}.nodes_part_list'.format(network_name), 'wb'))
 
 for network_name in target_network:
     """
@@ -42,17 +42,19 @@ for network_name in target_network:
     all_parts_name2index = defaultdict(dict)
     global_name2index = defaultdict(int)
     if network_name == 'flickr':
-        shared_number = 900
+        shared_number = 500
     elif network_name == 'myspace':
-        shared_number = 1400
+        shared_number = 500
 
     """nodes_part_list: a dictionary
     {
         community_id:[node_id,node_id]
     }
     """
-    nodes_part_list = pickle.load(open('./dataset/{}.nodes_part_list'.format(network_name), 'rb'))
+    nodes_part_list = pickle.load(open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'rb'))
 
+    # pdb.set_trace()
+    
     g_count = 0
     for part_name, part in enumerate(nodes_part_list):
         name2index_part = defaultdict(int)
@@ -65,12 +67,9 @@ for network_name in target_network:
                 global_name2index[node] = g_count
                 g_count = g_count + 1
 
-        pickle.dump(name2index_part, open('./dataset/{}_{}.name2index'.format(network_name, part_name), 'wb'))
+        pickle.dump(name2index_part, open('./dataset/{n}/{n}_{}.name2index'.format(part_name, n=network_name), 'wb'))
 
         all_parts_name2index[part_name] = name2index_part
 
-    pickle.dump(all_parts_name2index, open('./dataset/{}_all_parts.name2index'.format(network_name), 'wb'))
-    pickle.dump(global_name2index, open('./dataset/{}_global.name2index'.format(network_name), 'wb'))
-
-
-
+    pickle.dump(all_parts_name2index, open('./dataset/{n}/{n}_all_parts.name2index'.format(n=network_name), 'wb'))
+    pickle.dump(global_name2index, open('./dataset/{n}/{n}_global.name2index'.format(n=network_name), 'wb'))

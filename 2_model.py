@@ -148,9 +148,10 @@ if __name__ == "__main__":
     """
 
     epoches = 1000
-    for data_name in ['network_1', 'network_2']:
-        all_parts_name2index = pickle.load(open('./{}_all_parts.name2index'.format(data_name), 'rb'))
+    for data_name in ['flickr', 'myspace']:
+        all_parts_name2index = pickle.load(open('./dataset/{}_all_parts.name2index'.format(data_name), 'rb'))
         part_number = len(all_parts_name2index.keys())
+        pdb.set_trace()
         for part_name in range(part_number):
             adj = torch.load('./{}_{}.adj'.format(data_name, part_name)).to(device)
             links_pd = pd.read_csv('./{}_{}.links'.format(data_name, part_name), header=None)

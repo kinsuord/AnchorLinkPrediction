@@ -1,39 +1,47 @@
 #!usr/bin/env python
 # -*- coding:utf-8 _*-
+
+#%% Setup
 import pandas as pd
 import networkx as nx
+import torch
 import pickle
-import pdb
 import community
 from collections import defaultdict
 
+target_network = ["myspace", "flickr"]
+
+#%% Run partition
 def partition(graph, resolution=1):
     part = community.best_partition(graph, resolution=resolution)
     community_number = max(part.values()) + 1
-    print("community number: ", community_number)
+    print("community number: ", community_number, "nodesize", len(graph.nodes))
     nodes_part_list = []
     com2nodes = defaultdict(list)
     for node, com in part.items():
         com2nodes[com].append(node)
 
     for com, node_list in com2nodes.items():
-        if len(node_list) < 500:  # 500
+        if len(node_list) > 15000:  
+            rec_part_list = partition(nx.subgraph(graph, node_list))
+            nodes_part_list += rec_part_list
+        elif len(node_list) < 1000:  # 1000
             # print('community {} size {} and we ignore it'.format(com, len(node_list)))
             continue
         else:
-            print('community {} size {}'.format(com, len(node_list)))
+            # print('community {} size {}'.format(com, len(node_list)))
             nodes_part_list.append(node_list)
 
-    print('we have {} communities and each of them is larger than 500'.format(len(nodes_part_list)))
+    print('we have {} communities and each of them is larger than 1000'.format(len(nodes_part_list)))
     return nodes_part_list
 
-target_network = ["flickr", "myspace"]
+for network_name in target_network:
+    graph = nx.read_edgelist("./dataset/{n}/{n}.edges".format(n=network_name))
+    nodes_part_list = partition(graph)
+    print([len(part) for part in nodes_part_list])
+    pickle.dump(nodes_part_list, open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'wb'))
 
-# for network_name in target_network:
-#     graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
-#     nodes_part_list = partition(graph)
-#     pickle.dump(nodes_part_list, open('./dataset/{name}/{}.nodes_part_list'.format(network_name), 'wb'))
-
+#%% Preproccess with shared node
 for network_name in target_network:
     """
     network_1 shared_number:1056, 0:1055(含)是公共节点集合, 合并后变成了67个社区
@@ -52,8 +60,6 @@ for network_name in target_network:
     }
     """
     nodes_part_list = pickle.load(open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'rb'))
-
-    # pdb.set_trace()
     
     g_count = 0
     for part_name, part in enumerate(nodes_part_list):
@@ -73,3 +79,17 @@ for network_name in target_network:
 
     pickle.dump(all_parts_name2index, open('./dataset/{n}/{n}_all_parts.name2index'.format(n=network_name), 'wb'))
     pickle.dump(global_name2index, open('./dataset/{n}/{n}_global.name2index'.format(n=network_name), 'wb'))
+
+#%% Gen adj matrix
+
+for network_name in target_network:
+    graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
+    nodes_part_list = pickle.load(open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'rb'))
+    
+    for part_name, part in enumerate(nodes_part_list):
+        name2index_part = pickle.load(open('./dataset/{n}/{n}_{}.name2index'.format(part_name, n=network_name), 'rb'))
+        subG = graph.subgraph(name2index_part.keys())
+        reG = nx.relabel_nodes(subG, name2index_part)
+        reA = nx.adjacency_matrix(reG)
+        a_tensor = torch.from_numpy(reA.A)
+        torch.save(a_tensor, './dataset/{n}/{n}_{}.adj'.format(part_name, n=network_name))# %%

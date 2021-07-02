@@ -9,10 +9,10 @@ import numpy as np
 import os
 import pickle
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-print(device)
+torch.backends.cudnn.benchmark = True
+# print(device)
 
 
 class GraphConvolution(Module):
@@ -149,11 +149,14 @@ if __name__ == "__main__":
 
     epoches = 1000
     for data_name in ['flickr', 'myspace']:
-        all_parts_name2index = pickle.load(open('./dataset/{}_all_parts.name2index'.format(data_name), 'rb'))
+        path_prefix = "./dataset/{n}/{n}".format(n=data_name)
+
+        all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
         part_number = len(all_parts_name2index.keys())
         for part_name in range(part_number):
-            adj = torch.load('./{}_{}.adj'.format(data_name, part_name)).to(device)
-            links_pd = pd.read_csv('./{}_{}.links'.format(data_name, part_name), header=None)
+            adj = torch.load('{}_{}.adj'.format(path_prefix, part_name)).to(device)
+            links_pd = pd.read_csv('{}_{}.link'.format(path_prefix, part_name), header=None)
+            # import pdb; pdb.set_trace()
             links = torch.from_numpy(np.array(links_pd[[0, 1]]))
             links_target = torch.from_numpy(np.array(links_pd[2])).view(-1).to(device)
             positive_links = links[links_target == 1]
@@ -163,7 +166,7 @@ if __name__ == "__main__":
             './{data_name}_{part_name}.theta' calculated from hypergraph incident matirx(pyroch tensor)
             for a big graph, we make graph partition, each  partition is a part_name
             """
-            theta_path = './{}_{}.theta'.format(data_name, part_name)
+            theta_path = '{}_{}.theta'.format(path_prefix, part_name)
             theta = torch.load(theta_path).to(device)
 
             model = Machine(node_number=adj.shape[0],

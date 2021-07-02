@@ -14,6 +14,19 @@ from tqdm import tqdm
 
 target_network = ["myspace", "flickr"]
 
+# %% remove self loop in myspace
+# network_name = "myspace"
+
+# edges = []
+# with open("./dataset/{name}/{name}.edges".format(name=network_name), 'r') as f:
+#     for line in f.readlines():
+#         u, v = line.split(" ")
+#         if u != v[:-1]:
+#             edges.append(line)
+
+# with open("./dataset/{name}/{name}.edges".format(name=network_name), 'w') as f:
+#     f.write(''.join(edges))
+
 #%% Run partition
 def partition(graph, resolution=1):
     part = community.best_partition(graph, resolution=resolution)
@@ -112,7 +125,6 @@ for network_name in target_network:
     nodes_part_list = pickle.load(open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'rb'))
 
     for part_name, part in enumerate(tqdm(nodes_part_list)):
-        edgelist = []
         name2index_part = pickle.load(open('./dataset/{n}/{n}_{}.name2index'.format(part_name, n=network_name), 'rb'))
         subG = graph.subgraph(name2index_part.keys())
         reG = nx.relabel_nodes(subG, name2index_part)
@@ -143,7 +155,24 @@ for network_name in target_network:
                    'v': link_vs,
                    'target': target})
         
-        file = './dataset/{n}/{n}_{}.link'.format(part_name, n=network_name)
-        df.to_csv(file, index=False)
+        file = './dataset/{n}/{n}_{}.links'.format(part_name, n=network_name)
+        df.to_csv(file, header=False,index=False)
 
-#%% cal theta
+#%% cal hyperedge theta
+n_hop_beighbor = 10
+
+for network_name in target_network:
+    graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
+    nodes_part_list = pickle.load(open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'rb'))
+
+    for part_name, part in enumerate(tqdm(nodes_part_list)):
+        name2index_part = pickle.load(open('./dataset/{n}/{n}_{}.name2index'.format(part_name, n=network_name), 'rb'))
+        subG = graph.subgraph(name2index_part.keys())
+        reG = nx.relabel_nodes(subG, name2index_part)
+        reA = nx.adjacency_matrix(reG)
+
+        H = np.ones([len(reG.nodes()), len(reG.nodes())])
+        degree_mat_inv_sqrt = np.diag(reA.A.sum(1) ** -0.5)
+        theta = degree_mat_inv_sqrt @ H @ H @ degree_mat_inv_sqrt
+        theta_tensor = torch.from_numpy(theta)
+        torch.save(theta_tensor, './dataset/{n}/{n}_{}.theta'.format(part_name, n=network_name))

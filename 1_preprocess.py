@@ -8,6 +8,9 @@ import torch
 import pickle
 import community
 from collections import defaultdict
+import random
+import numpy as np
+from tqdm import tqdm 
 
 target_network = ["myspace", "flickr"]
 
@@ -92,4 +95,55 @@ for network_name in target_network:
         reG = nx.relabel_nodes(subG, name2index_part)
         reA = nx.adjacency_matrix(reG)
         a_tensor = torch.from_numpy(reA.A)
-        torch.save(a_tensor, './dataset/{n}/{n}_{}.adj'.format(part_name, n=network_name))# %%
+        torch.save(a_tensor, './dataset/{n}/{n}_{}.adj'.format(part_name, n=network_name))
+
+#%% Sample link
+negitive_sample = 5
+
+def sample_non_neighbor_node(g, v):
+    random_node = random.choice(g.nodes())
+    while random_node in g.neighbors(v):
+        random_node = random.choice(g.nodes())
+    return random_node
+    
+
+for network_name in target_network:
+    graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
+    nodes_part_list = pickle.load(open('./dataset/{n}/{n}.nodes_part_list'.format(n=network_name), 'rb'))
+
+    for part_name, part in enumerate(tqdm(nodes_part_list)):
+        edgelist = []
+        name2index_part = pickle.load(open('./dataset/{n}/{n}_{}.name2index'.format(part_name, n=network_name), 'rb'))
+        subG = graph.subgraph(name2index_part.keys())
+        reG = nx.relabel_nodes(subG, name2index_part)
+
+        link_us = []
+        link_vs = []
+        target = []
+        degrees_weight = np.array([ reG.degree(v) for v in reG.nodes()]) ** 0.75
+        node_set = set(reG.nodes())
+        for edge in reG.edges:
+            # add positive edges
+            link_us.append(edge[0])
+            link_vs.append(edge[1])
+            target.append(1)
+
+            for vertex in edge:
+                non_neighbors_set = node_set - set(reG.neighbors(vertex))
+                condidates = np.array(list(non_neighbors_set))
+                p = degrees_weight[condidates]
+                p /= p.sum()
+                neg_node = np.random.choice(condidates, negitive_sample, replace=False, p=p)
+
+                link_us += [vertex] * len(neg_node)
+                link_vs += list(neg_node)
+                target += [0] * len(neg_node)
+            
+        df = pd.DataFrame({'u': link_us,
+                   'v': link_vs,
+                   'target': target})
+        
+        file = './dataset/{n}/{n}_{}.link'.format(part_name, n=network_name)
+        df.to_csv(file, index=False)
+
+#%% cal theta

@@ -11,6 +11,7 @@ import pickle
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = "cpu"
 torch.backends.cudnn.benchmark = True
 # print(device)
 
@@ -74,7 +75,7 @@ class Machine(nn.Module):
         d_2: ae，one-hot模式下，压缩的隐藏层维度
         d_3: ae,one-hot模式下，输出的维度
         """
-
+        self.mode = ini_emb_mode
         super(Machine, self).__init__()
         self.node_number = node_number
         if ini_emb_mode == 'par':
@@ -84,7 +85,6 @@ class Machine(nn.Module):
             self.ini_embeddings = torch.nn.Parameter(torch.Tensor(node_number, self.d_1))
             torch.nn.init.xavier_uniform_(self.ini_embeddings)
         elif (ini_emb_mode == 'ae') or (ini_emb_mode == 'one_hot'):
-
             self.d_1 = embeddings_ae_or_one_hot.shape[1]  # 8560 for one_hot or 200 for ae, maybe
             self.d_2 = d_2  # 200
             self.d_3 = d_3  # 200
@@ -103,8 +103,8 @@ class Machine(nn.Module):
         self.gcn_k = 5
         self.gcn1 = GraphConvolution(self.d_1, self.d_2)  # (200, 100)
         self.gcn2 = GraphConvolution(self.d_2 * self.gcn_k, self.d_3)
-        self.hcn1 = HyperGraphConvolution(self.d_3, self.d_3)
-        self.hcn2 = HyperGraphConvolution(self.d_3, self.d_3)
+        # self.hcn1 = HyperGraphConvolution(self.d_3, self.d_3)
+        # self.hcn2 = HyperGraphConvolution(self.d_3, self.d_3)
 
     def forward(self, adj=None, theta=None):
 
@@ -116,9 +116,11 @@ class Machine(nn.Module):
 
         x = torch.cat(x_list, dim=1)
         x = self.gcn2(x, adj)
-        x = F.relu(self.hcn1(x, theta))
-        x = F.dropout(x, self.dropout)
-        self.embeddings_out = self.hcn2(x, theta)
+        # x = F.relu(self.hcn1(x, theta))
+        # x = F.dropout(x, self.dropout)
+        # self.embeddings_out = self.hcn2(x, theta)
+        self.embeddings_out = x
+        # import pdb; pdb.set_trace()
         return self.embeddings_out
 
     def embedding_loss(self, embeddings, positive_links, negtive_links):
@@ -130,12 +132,13 @@ class Machine(nn.Module):
         left_n = embeddings[negtive_links[:, 0]]
         right_n = embeddings[negtive_links[:, 1]]
         dots_n = torch.sum(torch.mul(left_n, right_n), dim=1)
-        negtive_loss = torch.mean(-1.0 * torch.log(1.01 - F.sigmoid(dots_n)))
+        negtive_loss = torch.mean(-1.0 * torch.log(1.01 - torch.sigmoid(dots_n)))
 
+        # print('dots_p', dots_p / 10000, 'dots_n', dots_n/100000)
         return positive_loss + negtive_loss
 
-    def save_embeddings(self, data_name='facebook'):
-        torch.save(self.embeddings_out, './' + data_name + '_before_' + self.mode + '.embeddings')
+    def save_embeddings(self, path):
+        torch.save(self.embeddings_out, path)
 
 
 if __name__ == "__main__":
@@ -147,7 +150,7 @@ if __name__ == "__main__":
     for a big graph, we make graph partition, each  partition is a part_name
     """
 
-    epoches = 1000
+    epoches = 5000
     for data_name in ['flickr', 'myspace']:
         path_prefix = "./dataset/{n}/{n}".format(n=data_name)
 
@@ -155,8 +158,9 @@ if __name__ == "__main__":
         part_number = len(all_parts_name2index.keys())
         for part_name in range(part_number):
             adj = torch.load('{}_{}.adj'.format(path_prefix, part_name)).to(device)
-            links_pd = pd.read_csv('{}_{}.link'.format(path_prefix, part_name), header=None)
-            # import pdb; pdb.set_trace()
+            print(adj.size())
+            links_pd = pd.read_csv('{}_{}.links'.format(path_prefix, part_name), header=None)
+            
             links = torch.from_numpy(np.array(links_pd[[0, 1]]))
             links_target = torch.from_numpy(np.array(links_pd[2])).view(-1).to(device)
             positive_links = links[links_target == 1]
@@ -167,28 +171,43 @@ if __name__ == "__main__":
             for a big graph, we make graph partition, each  partition is a part_name
             """
             theta_path = '{}_{}.theta'.format(path_prefix, part_name)
-            theta = torch.load(theta_path).to(device)
+            # theta = torch.load(theta_path).to(device)
 
             model = Machine(node_number=adj.shape[0],
-                            dropout=0.001,
+                            dropout=0.0001,
                             d_1=200, d_2=0, d_3=0,
                             ini_emb_mode='par').to(device)
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.00005)
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.00005)
 
             model.train()
 
             for epoch in range(epoches):
                 optimizer.zero_grad()
 
-                embeddings = model(adj=adj, theta=theta)
-
-                # print(embeddings)
-                loss = model.embedding_loss(embeddings, positive_links, negtive_links)
-
-                print("{} | part {}/{} | epoch {}/{} | loss: {:.4f}".format(data_name, part_name, part_number,
+                embeddings = model(adj=adj)
+                pos_ran_idxs = torch.randint(0, len(positive_links), (10000,), device=device)
+                neg_ran_idxs = torch.randint(0, len(negtive_links), (100000,), device=device)
+                loss = model.embedding_loss(embeddings, positive_links[pos_ran_idxs], negtive_links[neg_ran_idxs])
+                # loss = model.embedding_loss(embeddings, positive_links[:10000], negtive_links[:100000])
+                # loss = model.embedding_loss(embeddings, positive_links, negtive_links)
+                
+                if epoch % 100 == 0:
+                    print("{} | part {}/{} | epoch {}/{} | loss: {:.4f}".format(data_name, part_name, part_number,
                                                                                epoch, epoches, loss.item()))
-                loss.backward()
-                optimizer.step()
+                    loss.backward()
+                    optimizer.step()
+            
+            model.save_embeddings('{}_{}.embedding'.format(path_prefix, part_name))
 
-            model.save_embeddings(data_name='{}_{}'.format(data_name, part_name))
+            left_p = embeddings[positive_links[pos_ran_idxs][:, 0]]
+            right_p = embeddings[positive_links[pos_ran_idxs][:, 1]]
+            dots_p = torch.sum(torch.mul(left_p, right_p), dim=1)
+            positive_loss = torch.mean(-1.0 * F.logsigmoid(dots_p))
+            left_n = embeddings[negtive_links[neg_ran_idxs][:, 0]]
+            right_n = embeddings[negtive_links[neg_ran_idxs][:, 1]]
+            dots_n = torch.sum(torch.mul(left_n, right_n), dim=1)
+            negtive_loss = torch.mean(-1.0 * torch.log(1.01 - torch.sigmoid(dots_n)))
+            
+            del adj, model, loss, embeddings, optimizer, links_target
+            torch.cuda.empty_cache()

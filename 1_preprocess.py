@@ -107,7 +107,7 @@ for network_name in target_network:
         subG = graph.subgraph(name2index_part.keys())
         reG = nx.relabel_nodes(subG, name2index_part)
         reA = nx.adjacency_matrix(reG)
-        a_tensor = torch.from_numpy(reA.A)
+        a_tensor = torch.from_numpy(reA.A.astype(np.float32))
         torch.save(a_tensor, './dataset/{n}/{n}_{}.adj'.format(part_name, n=network_name))
 
 #%% Sample link
@@ -174,5 +174,5 @@ for network_name in target_network:
         H = np.ones([len(reG.nodes()), len(reG.nodes())])
         degree_mat_inv_sqrt = np.diag(reA.A.sum(1) ** -0.5)
         theta = degree_mat_inv_sqrt @ H @ H @ degree_mat_inv_sqrt
-        theta_tensor = torch.from_numpy(theta)
+        theta_tensor = torch.from_numpy(theta).to(torch.float32)
         torch.save(theta_tensor, './dataset/{n}/{n}_{}.theta'.format(part_name, n=network_name))

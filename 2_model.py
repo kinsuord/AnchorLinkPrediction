@@ -150,8 +150,8 @@ if __name__ == "__main__":
     for a big graph, we make graph partition, each  partition is a part_name
     """
 
-    epoches = 5000
-    for data_name in ['flickr', 'myspace']:
+    epoches = 2000
+    for data_name in ["flickr", 'myspace']:
         path_prefix = "./dataset/{n}/{n}".format(n=data_name)
 
         all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
@@ -178,7 +178,8 @@ if __name__ == "__main__":
                             d_1=200, d_2=0, d_3=0,
                             ini_emb_mode='par').to(device)
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.00005)
+            # optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.00005)
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
             model.train()
 
@@ -192,11 +193,11 @@ if __name__ == "__main__":
                 # loss = model.embedding_loss(embeddings, positive_links[:10000], negtive_links[:100000])
                 # loss = model.embedding_loss(embeddings, positive_links, negtive_links)
                 
-                if epoch % 100 == 0:
+                if epoch % 200 == 0:
                     print("{} | part {}/{} | epoch {}/{} | loss: {:.4f}".format(data_name, part_name, part_number,
                                                                                epoch, epoches, loss.item()))
-                    loss.backward()
-                    optimizer.step()
+                loss.backward()
+                optimizer.step()
             
             model.save_embeddings('{}_{}.embedding'.format(path_prefix, part_name))
 
@@ -208,6 +209,7 @@ if __name__ == "__main__":
             right_n = embeddings[negtive_links[neg_ran_idxs][:, 1]]
             dots_n = torch.sum(torch.mul(left_n, right_n), dim=1)
             negtive_loss = torch.mean(-1.0 * torch.log(1.01 - torch.sigmoid(dots_n)))
-            
+            print("dots_p", dots_p.mean().item(), "dots_n",dots_n.mean().item())
+
             del adj, model, loss, embeddings, optimizer, links_target
             torch.cuda.empty_cache()

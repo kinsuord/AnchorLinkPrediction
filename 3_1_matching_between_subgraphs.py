@@ -4,6 +4,7 @@ import torch.nn as nn
 import pandas as pd
 import numpy as np
 import os
+import yaml
 import pickle
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -42,22 +43,19 @@ class Matching(nn.Module):
 
 
 if __name__ == "__main__":
+    param_name = "gcn"
+    with open("params_{}.yaml".format(param_name), "r") as f:
+        params = yaml.safe_load(f)
+    save_dir = os.path.join("save", param_name)
 
-    epoches = 5000
+    epoches = params['match_part']['epoch']
 
     print('网络内matching...')
-    for data_name in ['flickr', 'myspace']:
-        """
-        if network_name == 'facebook':
-            network_alias = 'network_1'
-            shared_number = 1056
-        elif network_name == 'twitter':
-            network_alias = 'network_2'
-            shared_number = 1138
-        """
-        path_prefix = "./dataset/{n}/{n}".format(n=data_name)
+    for data_name in params['network_name']:
+        path_prefix = "{}/{}".format(save_dir, data_name)
 
-        shared_number = 500
+        shared_number = params['shared_node_in_part']
+        
         anchors_list = [[i, i] for i in range(shared_number)]
         anchors_p = torch.from_numpy(np.array(anchors_list)).to(device)  # left:0, right: others
 
@@ -70,12 +68,12 @@ if __name__ == "__main__":
             # embedding_1_name = '{}_{}'.format(data_name, 0)
             # embedding_2_name = '{}_{}'.format(data_name, part_name)
 
-            embedding_1 = torch.load('{}_0.embedding'.format(path_prefix))  # .cpu()  # others
-            embedding_2 = torch.load('{}_{}.embedding'.format(path_prefix, part_name))  # .cpu()  # 0
+            embedding_1 = torch.load('{}/0.embedding'.format(path_prefix))  # .cpu()  # others
+            embedding_2 = torch.load('{}/{}.embedding'.format(path_prefix, part_name))  # .cpu()  # 0
 
             model = Matching(embedding_1.shape[1]).to(device)
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.00005)
+            optimizer = torch.optim.Adam(model.parameters(), lr=params['match_part']['lr'], weight_decay=0.00005)
 
             model.train()
             for epoch in range(epoches):
@@ -91,8 +89,8 @@ if __name__ == "__main__":
                 optimizer.step()
 
             model.save_embeddings(
-                embedding_1_path='{}_0_after.embedding'.format(path_prefix), 
-                embedding_2_path='{}_{}_after.embedding'.format(path_prefix, part_name))
+                embedding_1_path='{}/0_match_part.embedding'.format(path_prefix), 
+                embedding_2_path='{}/{}_match_part.embedding'.format(path_prefix, part_name))
 
         # all_parts_name2index
         # {
@@ -109,10 +107,10 @@ if __name__ == "__main__":
 
         embedding_list = []  #
         for part_name in range(part_number):
-            emb = torch.load('{}_{}_after.embedding'.format(path_prefix, part_name))
+            emb = torch.load('{}/{}_match_part.embedding'.format(path_prefix, part_name))
             if part_name > 0:
                 emb = emb[shared_number:, :]
 
             embedding_list.append(emb)
         embedding_global = torch.cat(embedding_list, dim=0)
-        torch.save(embedding_global, '{}_global_after.embedding'.format(path_prefix))
+        torch.save(embedding_global, '{}_global_part.embedding'.format(path_prefix))

@@ -1,0 +1,29 @@
+network_name: 
+  - aminer
+  - linkedin
+
+# Preprocess
+partition:
+  min: 1000
+  max: 15000
+
+shared_node_in_part: 1000
+negitive_link_num: 5
+
+# Model
+embedding:
+  name: gcn_only
+  lr: 0.001
+  epoch: 1000
+
+# Match
+match_part:
+  lr: 0.0001
+  epoch: 5000
+
+match_network:
+  lr: 0.0001
+  epoch: 10000
+
+anchor_predict:
+  epoch: 10000

@@ -1,4 +1,5 @@
 import math
+import yaml
 import torch
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
@@ -146,20 +147,25 @@ if __name__ == "__main__":
     """
     './{data_name}_{part_name}.adj' adj matrix for each partition of the dataset.
     './{data_name}_{part_name}.theta' calculated from hypergraph incident matirx(pyroch tensor)
-    
     for a big graph, we make graph partition, each  partition is a part_name
     """
+    param_name = "gcn"
+    with open("params_{}.yaml".format(param_name), "r") as f:
+        params = yaml.safe_load(f)
+    save_dir = os.path.join("save", param_name)
 
-    epoches = 2000
-    for data_name in ["flickr", 'myspace']:
-        path_prefix = "./dataset/{n}/{n}".format(n=data_name)
+    target_network = params['network_name']
+
+    epoches = params['embedding']['epoch']
+    for data_name in target_network:
+        path_prefix = "{}/{}".format(save_dir, data_name)
 
         all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
         part_number = len(all_parts_name2index.keys())
         for part_name in range(part_number):
-            adj = torch.load('{}_{}.adj'.format(path_prefix, part_name)).to(device)
+            adj = torch.load('{}/{}.adj'.format(path_prefix, part_name)).to(device)
             print(adj.size())
-            links_pd = pd.read_csv('{}_{}.links'.format(path_prefix, part_name), header=None)
+            links_pd = pd.read_csv('{}/{}.links'.format(path_prefix, part_name), header=None)
             
             links = torch.from_numpy(np.array(links_pd[[0, 1]]))
             links_target = torch.from_numpy(np.array(links_pd[2])).view(-1).to(device)
@@ -170,16 +176,17 @@ if __name__ == "__main__":
             './{data_name}_{part_name}.theta' calculated from hypergraph incident matirx(pyroch tensor)
             for a big graph, we make graph partition, each  partition is a part_name
             """
-            theta_path = '{}_{}.theta'.format(path_prefix, part_name)
+            # theta_path = '{}_{}.theta'.format(path_prefix, part_name)
             # theta = torch.load(theta_path).to(device)
+            if params['embedding']['name'] == "gcn_only":
+                model = Machine(node_number=adj.shape[0],
+                                dropout=0.0001,
+                                d_1=200, d_2=0, d_3=0,
+                                ini_emb_mode='par').to(device)
+            else:
+                raise Exception('Unknown network name')
 
-            model = Machine(node_number=adj.shape[0],
-                            dropout=0.0001,
-                            d_1=200, d_2=0, d_3=0,
-                            ini_emb_mode='par').to(device)
-
-            # optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.00005)
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+            optimizer = torch.optim.Adam(model.parameters(), lr=params['embedding']['lr'])
 
             model.train()
 
@@ -199,7 +206,7 @@ if __name__ == "__main__":
                 loss.backward()
                 optimizer.step()
             
-            model.save_embeddings('{}_{}.embedding'.format(path_prefix, part_name))
+            model.save_embeddings('{}/{}.embedding'.format(path_prefix, part_name))
 
             left_p = embeddings[positive_links[pos_ran_idxs][:, 0]]
             right_p = embeddings[positive_links[pos_ran_idxs][:, 1]]

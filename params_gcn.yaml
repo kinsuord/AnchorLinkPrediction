@@ -7,7 +7,6 @@ partition:
   min: 1000
   max: 15000
 
-shared_node_in_part: 1000
 negitive_link_num: 5
 
 # Model

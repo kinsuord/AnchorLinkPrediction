@@ -52,7 +52,7 @@ for network_name in target_network:
 # with open("./dataset/{name}/{name}.edges".format(name=network_name), 'w') as f:
 #     f.write(''.join(edges))
 
-#%% Run partition
+#%% Run partition and save nodes_part_list
 def partition(graph):
     part = community.best_partition(graph)
     community_number = max(part.values()) + 1
@@ -80,18 +80,23 @@ for network_name in target_network:
     graph = nx.read_edgelist("./dataset/{n}/{n}.edges".format(n=network_name))
     nodes_part_list = partition(graph)
     print([len(part) for part in nodes_part_list])
+
+    # append shared part
+    new_nodes_part_list = []
+    for i, part in enumerate(nodes_part_list):
+        if i == 0:
+            new_nodes_part_list.append(part)
+        else:
+            new_nodes_part_list.append( nodes_part_list[0] + part)
+
     nodes_part_list_path = '{}/{}.nodes_part_list'.format(save_dir, network_name)
-    pickle.dump(nodes_part_list, open(nodes_part_list_path, 'wb'))
+    pickle.dump(new_nodes_part_list, open(nodes_part_list_path, 'wb'))
 
 #%% Preproccess with shared node
 for network_name in target_network:
-    """
-    network_1 shared_number:1056, 0:1055(含)是公共节点集合, 合并后变成了67个社区
-    network_2 shared_number:1138, 0:1137(含)是公共节点集合, 合并后变成了87个社区
-    """
+
     all_parts_name2index = defaultdict(dict)
     global_name2index = defaultdict(int)
-    shared_number = params['shared_node_in_part']
 
     """nodes_part_list: a dictionary
     {
@@ -100,6 +105,8 @@ for network_name in target_network:
     """
     nodes_part_list_path = '{}/{}.nodes_part_list'.format(save_dir, network_name)
     nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
+
+    shared_number = len(nodes_part_list[0])
     
     g_count = 0
     for part_name, part in enumerate(nodes_part_list):
@@ -130,7 +137,7 @@ for network_name in target_network:
     nodes_part_list_path = '{}/{}.nodes_part_list'.format(save_dir, network_name)
     nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
 
-    for part_name, part in enumerate(nodes_part_list):
+    for part_name, part in enumerate(tqdm(nodes_part_list)):
         name2index_part_path = '{}/{}/{}.name2index'.format(save_dir, network_name, part_name)
         name2index_part = pickle.load(open(name2index_part_path, 'rb'))
 
@@ -144,12 +151,6 @@ for network_name in target_network:
 
 #%% Sample link
 negitive_sample = params['negitive_link_num']
-
-def sample_non_neighbor_node(g, v):
-    random_node = random.choice(g.nodes())
-    while random_node in g.neighbors(v):
-        random_node = random.choice(g.nodes())
-    return random_node
     
 for network_name in target_network:
     graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
@@ -230,6 +231,11 @@ with open("./dataset/{n}/{n}.nodes".format(n=target_network[1]), 'r', encoding="
     n2_nodedict = [[line[1], line[0]] for line in n2_nodedict]
     n2_nodedict = dict(n2_nodedict)
 
+global_name2index_path = '{}/{}_global.name2index'.format(save_dir, target_network[0])
+global_name2index_1 = pickle.load(open(global_name2index_path, 'rb'))
+global_name2index_path = '{}/{}_global.name2index'.format(save_dir, target_network[1])
+global_name2index_2 = pickle.load(open(global_name2index_path, 'rb'))
+
 anchor_us = []
 anchor_vs = []
 for names in anchors:
@@ -239,8 +245,19 @@ for names in anchors:
     if names[1] not in n2_nodedict:
         print("n2_nodedict key not found", names[1])
         continue
-    anchor_us.append(n1_nodedict[names[0]])
-    anchor_vs.append(n2_nodedict[names[1]])
+
+    if n1_nodedict[names[0]] not in global_name2index_1:
+        print("n1 not found", n1_nodedict[names[0]])
+        continue
+    if n2_nodedict[names[1]] not in global_name2index_2:
+        print("n2 not found", n2_nodedict[names[1]])
+        continue
+
+    anchor_us.append(global_name2index_1[n1_nodedict[names[0]]])
+    anchor_vs.append(global_name2index_2[n2_nodedict[names[1]]])
+
+# TODO
+# Check global_name2index_1 vs node length
 
 df = pd.DataFrame({
     target_network[0]: anchor_us,
@@ -286,12 +303,12 @@ train.to_csv(train_anchor_path, header=False,index=False)
 test_anchor_path = '{}/test_anchors_p_n.df'.format(save_dir)
 test.to_csv(test_anchor_path, header=False,index=False)
 
-#%%
-for data_name in target_network:
-    path_prefix = "{}/{}".format(save_dir, data_name)
+# #%%
+# for data_name in target_network:
+#     path_prefix = "{}/{}".format(save_dir, data_name)
 
-    all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
-    global_name2index = pickle.load(open('{}_global.name2index'.format(path_prefix), 'rb'))
-    nodes_part_list_path = '{}.nodes_part_list'.format(path_prefix)
-    nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
+#     all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
+#     global_name2index = pickle.load(open('{}_global.name2index'.format(path_prefix), 'rb'))
+#     nodes_part_list_path = '{}.nodes_part_list'.format(path_prefix)
+#     nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
     

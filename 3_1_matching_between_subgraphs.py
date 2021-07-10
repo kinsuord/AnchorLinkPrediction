@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import os
 import yaml
+import tqdm
 import pickle
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -54,20 +55,19 @@ if __name__ == "__main__":
     for data_name in params['network_name']:
         path_prefix = "{}/{}".format(save_dir, data_name)
 
-        shared_number = params['shared_node_in_part']
+        nodes_part_list_path = '{}.nodes_part_list'.format(path_prefix)
+        nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
+        shared_number = len(nodes_part_list[0])
         
         anchors_list = [[i, i] for i in range(shared_number)]
         anchors_p = torch.from_numpy(np.array(anchors_list)).to(device)  # left:0, right: others
 
         all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
         part_number = len(all_parts_name2index.keys())
-        print(part_number)
+        # print(part_number)
         # for mode in ['mine']:
 
-        for part_name in range(1, part_number):
-            # embedding_1_name = '{}_{}'.format(data_name, 0)
-            # embedding_2_name = '{}_{}'.format(data_name, part_name)
-
+        for part_name in tqdm(range(1, part_number)):
             embedding_1 = torch.load('{}/0.embedding'.format(path_prefix))  # .cpu()  # others
             embedding_2 = torch.load('{}/{}.embedding'.format(path_prefix, part_name))  # .cpu()  # 0
 

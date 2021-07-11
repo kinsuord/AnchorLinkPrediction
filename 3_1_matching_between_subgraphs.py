@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import os
 import yaml
-import tqdm
+from tqdm import tqdm 
 import pickle
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "2"

@@ -7,8 +7,9 @@ import torch.nn.functional as F
 import torch.nn as nn
 import pandas as pd
 import numpy as np
-import os
+from tqdm import tqdm
 import pickle
+import os
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -162,7 +163,7 @@ if __name__ == "__main__":
 
         all_parts_name2index = pickle.load(open('{}_all_parts.name2index'.format(path_prefix), 'rb'))
         part_number = len(all_parts_name2index.keys())
-        for part_name in range(part_number):
+        for part_name in tqdm(range(part_number)):
             adj = torch.load('{}/{}.adj'.format(path_prefix, part_name)).to(device)
             print(adj.size())
             links_pd = pd.read_csv('{}/{}.links'.format(path_prefix, part_name), header=None)

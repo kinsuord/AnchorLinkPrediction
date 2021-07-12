@@ -325,29 +325,34 @@ test_p_n.to_csv(test_anchor_path, header=False,index=False)
 # global_name2index_path = '{}_global.name2index'.format(path2_prefix)
 # name2index_2 = pickle.load(open(global_name2index_path, 'rb'))
 
-# #%% cal hyperedge theta
-# # n_hop_beighbor = 10
+#%% cal hyperedge theta
+n_hop_beighbor = 10
 
-# for network_name in target_network:
-#     graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
-#     nodes_part_list_path = '{}/{}.nodes_part_list'.format(save_dir, network_name)
-#     nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
+if "theta" in params:
+    for network_name in target_network:
+        graph = nx.read_edgelist("./dataset/{name}/{name}.edges".format(name=network_name))
+        nodes_part_list_path = '{}/{}.nodes_part_list'.format(save_dir, network_name)
+        nodes_part_list = pickle.load(open(nodes_part_list_path, 'rb'))
 
-#     for part_name, part in enumerate(tqdm(nodes_part_list)):
-#         name2index_part_path = '{}/{}/{}.name2index'.format(save_dir, network_name, part_name)
-#         name2index_part = pickle.load(open(name2index_part_path, 'rb'))
+        for part_name, part in enumerate(tqdm(nodes_part_list)):
+            name2index_part_path = '{}/{}/{}.name2index'.format(save_dir, network_name, part_name)
+            name2index_part = pickle.load(open(name2index_part_path, 'rb'))
 
-#         subG = graph.subgraph(name2index_part.keys())
-#         reG = nx.relabel_nodes(subG, name2index_part)
-#         reA = nx.adjacency_matrix(reG)
+            subG = graph.subgraph(name2index_part.keys())
+            reG = nx.relabel_nodes(subG, name2index_part)
+            reA = nx.adjacency_matrix(reG)
 
-#         H = np.ones([len(reG.nodes()), len(reG.nodes())])
-#         degree_mat_inv_sqrt = np.diag(len(reG.nodes()) ** -0.5)
-#         theta = degree_mat_inv_sqrt @ H @ H @ degree_mat_inv_sqrt
-#         theta_tensor = torch.from_numpy(theta).to(torch.float32)
-
-#         theta_path = '{}/{}/{}.theta'.format(save_dir, network_name, part_name)
-#         torch.save(theta_tensor, theta_path)
+            if params["theta"] == "mean":
+                H = np.ones([len(reG.nodes()), len(reG.nodes())])
+                degree_mat_inv_sqrt = np.diag(len(reG.nodes()) ** -0.5)
+                theta = degree_mat_inv_sqrt @ H @ H @ degree_mat_inv_sqrt
+            elif params["theta"] == "neighbor":
+                length = dict(nx.all_pairs_shortest_path_length(reG))
+            else:
+                raise ValueError("Unknown theta type")
+            theta_tensor = torch.from_numpy(theta).to(torch.float32)
+            theta_path = '{}/{}/{}.theta'.format(save_dir, network_name, part_name)
+            torch.save(theta_tensor, theta_path)
 
 # #%% 10 hop test?
 # from networkx.algorithms import distance_measures

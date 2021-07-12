@@ -148,8 +148,8 @@ test = pd.read_csv(test_anchor_path, header=None)
 
 df = train.append(test)
 
-for data_index, data_name in enumerate(target_network):
-    path_prefix = "{}/{}".format(save_dir, data_name)
+for data_index, network_name in enumerate(target_network):
+    path_prefix = "{}/{}".format(save_dir, network_name)
     partition_path = '{}.partition'.format(path_prefix)
     partition_list = pickle.load(open(partition_path, 'rb'))
     partition_list = np.array(partition_list,dtype=object)

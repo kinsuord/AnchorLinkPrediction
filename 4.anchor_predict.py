@@ -17,8 +17,10 @@ class LinearClassifier(nn.Module):
         self.dropout = dropout
 
     def forward(self, embedding_1, embedding_2, anchors_p_n):
-        anchor_embedding = torch.cat([embedding_1[anchors_p_n[:, 0]],
-                                      embedding_2[anchors_p_n[:, 1]]],
+        # import pdb; pdb.set_trace()
+        em1 = embedding_1.index_select(0, anchors_p_n[:, 0]) 
+        em2 = embedding_2.index_select(0, anchors_p_n[:, 1]) 
+        anchor_embedding = torch.cat([em1,em2],
                                      dim=1)
         # print(anchor_embedding)
         anchor_embedding = self.fc1(anchor_embedding)
@@ -68,7 +70,7 @@ if __name__ == "__main__":
     test_anchors_p_n_df = pd.concat([p_df, n_df], axis=0)
     test_anchors_p_n_df = test_anchors_p_n_df.sample(frac=1.0)
     test_anchors_p_n = map2global_index(test_anchors_p_n_df[[0, 1]], name2index_1, name2index_2)
-    test_anchors_p_n = torch.from_numpy(test_anchors_p_n)
+    test_anchors_p_n = torch.from_numpy(test_anchors_p_n).to(device)
     test_target = torch.from_numpy(np.array(test_anchors_p_n_df[2])).view(-1).to(device)
 
     train_anchor_path = '{}/observed_anchors_p_n.df'.format(save_dir)
@@ -79,7 +81,7 @@ if __name__ == "__main__":
     observed_anchors_p_n_df = pd.concat([p_df, n_df], axis=0)
     observed_anchors_p_n_df = observed_anchors_p_n_df.sample(frac=1.0)
     observed_anchors_p_n = map2global_index(observed_anchors_p_n_df[[0, 1]], name2index_1, name2index_2)
-    observed_anchors_p_n = torch.from_numpy(observed_anchors_p_n)
+    observed_anchors_p_n = torch.from_numpy(observed_anchors_p_n).to(device)
     observed_target = torch.from_numpy(np.array(observed_anchors_p_n_df[2])).view(-1).to(device)
 
     # observed_anchors_p_n = torch.load('./observed_anchors_p_n.torch').to(device)
@@ -93,8 +95,6 @@ if __name__ == "__main__":
     path2_prefix = "{}/{}".format(save_dir, data_names[1])
     embedding_1 = torch.load('{}_network_match.embedding'.format(path1_prefix)).to(device)
     embedding_2 = torch.load('{}_network_match.embedding'.format(path2_prefix)).to(device)
-    print(embedding_1)
-    print(embedding_2)
     model = LinearClassifier(d_embedding_after=embedding_1.shape[1], d_hid=100, nclass=2, dropout=0.00001).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.000005)
@@ -132,7 +132,7 @@ if __name__ == "__main__":
             best_f1 = test_maf1
         if best_rec < test_marec:
             best_rec = test_marec
-        if epoch % 1 == 0:
+        if epoch % 200 == 0:
             print( ": epoch:{}/{} "
                             "train_loss:{:.4f}|"
                             "test_loss:{:.4f} | "

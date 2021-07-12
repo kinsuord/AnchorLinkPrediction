@@ -31,10 +31,18 @@ class LinearClassifier(nn.Module):
         return anchor_embedding
 
 
+def map2global_index(df, global_name2index_1, global_name2index_2):
+    anchors = []
+    for _, anchor in df.iterrows():
+        anchors.append([global_name2index_1[str(anchor[0])], global_name2index_2[str(anchor[1])]])
+    return np.array(anchors)
+
+
 if __name__ == "__main__":
     import pandas as pd
     import numpy as np
     import yaml
+    import pickle
 
     param_name = "gcn"
     with open("params_{}.yaml".format(param_name), "r") as f:
@@ -42,8 +50,12 @@ if __name__ == "__main__":
     save_dir = os.path.join("save", param_name)
     data_names = params['network_name']
 
-    embedding_1_name = params['network_name'][0]
-    embedding_2_name = params['network_name'][1]
+    path1_prefix = "{}/{}".format(save_dir, data_names[0])
+    path2_prefix = "{}/{}".format(save_dir, data_names[1])
+    global_name2index_path = '{}_global.name2index'.format(path1_prefix)
+    name2index_1 = pickle.load(open(global_name2index_path, 'rb'))
+    global_name2index_path = '{}_global.name2index'.format(path2_prefix)
+    name2index_2 = pickle.load(open(global_name2index_path, 'rb'))
 
     print("preparing link data...")
     # test_anchors_p_n = torch.load('./test_anchors_p_n.torch')
@@ -55,7 +67,8 @@ if __name__ == "__main__":
     n_df = n_df.sample(frac=0.5, replace=True)
     test_anchors_p_n_df = pd.concat([p_df, n_df], axis=0)
     test_anchors_p_n_df = test_anchors_p_n_df.sample(frac=1.0)
-    test_anchors_p_n = torch.from_numpy(np.array(test_anchors_p_n_df[[0, 1]]))
+    test_anchors_p_n = map2global_index(test_anchors_p_n_df[[0, 1]], name2index_1, name2index_2)
+    test_anchors_p_n = torch.from_numpy(test_anchors_p_n)
     test_target = torch.from_numpy(np.array(test_anchors_p_n_df[2])).view(-1).to(device)
 
     train_anchor_path = '{}/observed_anchors_p_n.df'.format(save_dir)
@@ -65,8 +78,8 @@ if __name__ == "__main__":
     n_df = n_df.sample(frac=0.5, replace=True)
     observed_anchors_p_n_df = pd.concat([p_df, n_df], axis=0)
     observed_anchors_p_n_df = observed_anchors_p_n_df.sample(frac=1.0)
-
-    observed_anchors_p_n = torch.from_numpy(np.array(observed_anchors_p_n_df[[0, 1]]))
+    observed_anchors_p_n = map2global_index(observed_anchors_p_n_df[[0, 1]], name2index_1, name2index_2)
+    observed_anchors_p_n = torch.from_numpy(observed_anchors_p_n)
     observed_target = torch.from_numpy(np.array(observed_anchors_p_n_df[2])).view(-1).to(device)
 
     # observed_anchors_p_n = torch.load('./observed_anchors_p_n.torch').to(device)
@@ -74,6 +87,7 @@ if __name__ == "__main__":
     t_p = observed_target[observed_target == 1]
     t_n = observed_target[observed_target == 0]
     print('p/n:{}/{}'.format(t_p.shape[0], t_n.shape[0]))
+
 
     path1_prefix = "{}/{}".format(save_dir, data_names[0])
     path2_prefix = "{}/{}".format(save_dir, data_names[1])

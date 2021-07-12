@@ -22,7 +22,7 @@ match_part:
 
 match_network:
   lr: 0.0001
-  epoch: 10000
+  epoch: 5000
 
 anchor_predict:
   epoch: 10000
